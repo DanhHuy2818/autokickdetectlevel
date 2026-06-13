@@ -1,0 +1,396 @@
+-- Blox Fruits Level Out - simple
+-- Chuc nang: dat LevelOut, khi level nhan vat >= moc do thi kick/out game.
+-- Data path lay tu script quest-out:
+--   LocalPlayer.Data.Level
+--   fallback PlayerGui.Main.Level.Text = "Lv. 223"
+
+local Autostart = "false"     -- true = tu bat khi chay script, false = bam Start
+local Autokick  = "true"     -- true = kick/out that, false = test chi bao STOP
+local LevelOut  = ""      -- doi moc tai day, vi du "250", "700", "2800"
+
+local CHECK_INTERVAL = 0.20
+local UI_INTERVAL = 0.25
+local PATH_REFRESH_INTERVAL = 2
+local MAX_LEVEL = 2800
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UIS = game:GetService("UserInputService")
+local LP = Players.LocalPlayer
+
+local AUTOSTART = tostring(Autostart):lower()
+local AUTOKICK = tostring(Autokick):lower()
+local TARGET_LEVEL = tonumber(tostring(LevelOut):match("%d+")) or 0
+
+local DATA = {
+    level = nil,
+}
+
+local PATH = {
+    dataLevel = nil,
+    main = nil,
+    levelGui = nil,
+}
+
+local STATE = {
+    running = false,
+    destroyed = false,
+    kicked = false,
+    source = "Stopped",
+    alert = "Stopped",
+    safe = true,
+}
+
+local function safe(fn)
+    local ok, res = pcall(fn)
+    if ok then return res end
+    return nil
+end
+
+local function readText(obj)
+    if not obj then return nil end
+    local v = safe(function() return obj.Text end)
+    if v == nil then return nil end
+    return tostring(v)
+end
+
+local function readValue(obj)
+    if not obj then return nil end
+    return safe(function() return obj.Value end)
+end
+
+local function refreshPaths()
+    local pg = LP:FindFirstChildOfClass("PlayerGui")
+    local data = LP:FindFirstChild("Data")
+
+    PATH.dataLevel = data and data:FindFirstChild("Level") or nil
+    PATH.main = pg and pg:FindFirstChild("Main") or nil
+    PATH.levelGui = PATH.main and PATH.main:FindFirstChild("Level") or nil
+end
+
+local function readLevel()
+    local level = tonumber(readValue(PATH.dataLevel))
+    if not level then
+        local lvText = readText(PATH.levelGui)
+        level = lvText and tonumber(lvText:match("Lv%.?%s*(%d+)")) or nil
+    end
+
+    if level and level >= 1 and level <= MAX_LEVEL then
+        DATA.level = level
+    end
+
+    return DATA.level
+end
+
+local function kickNow()
+    if STATE.kicked then return end
+    STATE.kicked = true
+    task.wait(0.12)
+    pcall(function()
+        LP:Kick("[LevelOut] Level da toi moc " .. tostring(TARGET_LEVEL))
+    end)
+    task.wait(1)
+    pcall(function()
+        game:Shutdown()
+    end)
+end
+
+pcall(function()
+    local old = game.CoreGui:FindFirstChild("BFLevelOut")
+    if old then old:Destroy() end
+end)
+
+local gui = Instance.new("ScreenGui")
+gui.Name = "BFLevelOut"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = game.CoreGui
+
+local function corner(obj, r)
+    local c = Instance.new("UICorner", obj)
+    c.CornerRadius = UDim.new(0, r or 6)
+end
+
+local function stroke(obj, color, t)
+    local s = Instance.new("UIStroke", obj)
+    s.Color = color
+    s.Thickness = t or 1
+end
+
+local panel = Instance.new("Frame", gui)
+panel.Size = UDim2.new(0, 178, 0, 154)
+panel.Position = UDim2.new(1, -192, 0, 12)
+panel.BackgroundColor3 = Color3.fromRGB(8, 8, 16)
+panel.BackgroundTransparency = 0.06
+panel.BorderSizePixel = 0
+panel.Active = true
+panel.Draggable = true
+corner(panel, 8)
+stroke(panel, Color3.fromRGB(255, 150, 0), 2)
+
+local scale = Instance.new("UIScale", panel)
+scale.Scale = 0.86
+
+local header = Instance.new("Frame", panel)
+header.Size = UDim2.new(1, 0, 0, 24)
+header.BackgroundColor3 = Color3.fromRGB(100, 50, 0)
+header.BorderSizePixel = 0
+corner(header, 8)
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(1, -28, 1, 0)
+title.Position = UDim2.new(0, 6, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "LevelOut " .. (AUTOKICK == "true" and "[K]" or "[T]")
+title.TextColor3 = Color3.fromRGB(255, 220, 90)
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+title.TextXAlignment = Enum.TextXAlignment.Left
+
+local closeBtn = Instance.new("TextButton", header)
+closeBtn.Size = UDim2.new(0, 20, 0, 20)
+closeBtn.Position = UDim2.new(1, -23, 0, 2)
+closeBtn.BackgroundColor3 = Color3.fromRGB(170, 25, 25)
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.new(1, 1, 1)
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.TextScaled = true
+corner(closeBtn, 4)
+
+local rowY = 30
+local function row(label, color)
+    local f = Instance.new("Frame", panel)
+    f.Size = UDim2.new(1, -10, 0, 18)
+    f.Position = UDim2.new(0, 5, 0, rowY)
+    f.BackgroundTransparency = 1
+    rowY = rowY + 20
+
+    local l = Instance.new("TextLabel", f)
+    l.Size = UDim2.new(0.43, 0, 1, 0)
+    l.BackgroundTransparency = 1
+    l.Text = label
+    l.TextColor3 = Color3.fromRGB(125, 125, 145)
+    l.Font = Enum.Font.Gotham
+    l.TextScaled = true
+    l.TextXAlignment = Enum.TextXAlignment.Left
+
+    local v = Instance.new("TextLabel", f)
+    v.Size = UDim2.new(0.57, 0, 1, 0)
+    v.Position = UDim2.new(0.43, 0, 0, 0)
+    v.BackgroundTransparency = 1
+    v.Text = "--"
+    v.TextColor3 = color or Color3.new(1, 1, 1)
+    v.Font = Enum.Font.GothamBold
+    v.TextScaled = true
+    v.TextXAlignment = Enum.TextXAlignment.Left
+    return v
+end
+
+local vSrc = row("Data", Color3.fromRGB(100, 255, 100))
+local vLv = row("Level", Color3.fromRGB(100, 220, 255))
+local vTarget = row("Moc", Color3.fromRGB(255, 210, 80))
+local vKick = row("Kick", Color3.fromRGB(255, 90, 80))
+
+local alertBox = Instance.new("Frame", panel)
+alertBox.Size = UDim2.new(1, -10, 0, 30)
+alertBox.Position = UDim2.new(0, 5, 0, rowY + 2)
+alertBox.BackgroundColor3 = Color3.fromRGB(14, 14, 26)
+alertBox.BorderSizePixel = 0
+corner(alertBox, 6)
+rowY = rowY + 36
+
+local alertText = Instance.new("TextLabel", alertBox)
+alertText.Size = UDim2.new(1, -6, 1, -2)
+alertText.Position = UDim2.new(0, 3, 0, 1)
+alertText.BackgroundTransparency = 1
+alertText.Text = "Stopped"
+alertText.TextColor3 = Color3.fromRGB(130, 130, 150)
+alertText.Font = Enum.Font.GothamBold
+alertText.TextScaled = true
+alertText.TextWrapped = true
+
+local toggleBtn = Instance.new("TextButton", panel)
+toggleBtn.Size = UDim2.new(1, -10, 0, 28)
+toggleBtn.Position = UDim2.new(0, 5, 0, rowY)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
+toggleBtn.Text = "Start"
+toggleBtn.TextColor3 = Color3.new(1, 1, 1)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextScaled = true
+corner(toggleBtn, 7)
+rowY = rowY + 32
+panel.Size = UDim2.new(0, 178, 0, rowY + 4)
+
+local resize = Instance.new("TextButton", panel)
+resize.Size = UDim2.new(0, 18, 0, 18)
+resize.Position = UDim2.new(1, -18, 1, -18)
+resize.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+resize.Text = ""
+resize.ZIndex = 10
+corner(resize, 4)
+
+local resizing = false
+local resizeStartMouse = nil
+local resizeStartScale = nil
+local resizeInput = nil
+
+local function beginResize(pos, input)
+    resizing = true
+    resizeStartMouse = pos
+    resizeStartScale = scale.Scale
+    resizeInput = input
+end
+
+resize.MouseButton1Down:Connect(function()
+    beginResize(UIS:GetMouseLocation(), nil)
+end)
+
+resize.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.Touch then
+        beginResize(Vector2.new(input.Position.X, input.Position.Y), input)
+    end
+end)
+
+UIS.InputChanged:Connect(function(input)
+    if not resizing then return end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input == resizeInput then
+        local pos = input.UserInputType == Enum.UserInputType.MouseMovement
+            and UIS:GetMouseLocation()
+            or Vector2.new(input.Position.X, input.Position.Y)
+        local dx = (pos.X - resizeStartMouse.X) / 220
+        local dy = (pos.Y - resizeStartMouse.Y) / 240
+        local delta = math.abs(dx) > math.abs(dy) and dx or dy
+        scale.Scale = math.clamp(resizeStartScale + delta, 0.55, 1.35)
+    end
+end)
+
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input == resizeInput then
+        resizing = false
+        resizeInput = nil
+    end
+end)
+
+local lastPathRefresh = 0
+local loopConn = nil
+
+local function updateLogic()
+    local now = tick()
+    if now - lastPathRefresh >= PATH_REFRESH_INTERVAL then
+        lastPathRefresh = now
+        refreshPaths()
+    end
+
+    local ok, err = pcall(readLevel)
+    if not ok then
+        STATE.source = "Read error"
+        STATE.alert = tostring(err):sub(1, 80)
+        STATE.safe = true
+        return
+    end
+
+    local lv = DATA.level
+    if not lv then
+        STATE.source = "No level"
+        STATE.alert = "Dang tim level"
+        STATE.safe = true
+        return
+    end
+
+    if TARGET_LEVEL <= 0 then
+        STATE.source = "No moc"
+        STATE.alert = "Sua LevelOut truoc"
+        STATE.safe = true
+        return
+    end
+
+    if lv >= TARGET_LEVEL then
+        STATE.source = "STOP"
+        STATE.alert = "Level >= " .. tostring(TARGET_LEVEL)
+        STATE.safe = false
+        if AUTOKICK == "true" and STATE.running then
+            STATE.running = false
+            task.spawn(kickNow)
+        end
+    else
+        STATE.source = "OK"
+        STATE.alert = "Dang cho moc"
+        STATE.safe = true
+    end
+end
+
+local function updateUi()
+    vSrc.Text = STATE.running and STATE.source or "Stopped"
+    vSrc.TextColor3 = STATE.safe and Color3.fromRGB(80, 255, 120) or Color3.fromRGB(255, 90, 80)
+    vLv.Text = DATA.level and tostring(DATA.level) or "--"
+    vTarget.Text = TARGET_LEVEL > 0 and tostring(TARGET_LEVEL) or "--"
+    vKick.Text = AUTOKICK == "true" and "ON" or "OFF"
+    vKick.TextColor3 = AUTOKICK == "true" and Color3.fromRGB(255, 80, 80) or Color3.fromRGB(255, 210, 80)
+
+    alertText.Text = STATE.running and STATE.alert or "Stopped"
+    if STATE.running and not STATE.safe then
+        alertText.TextColor3 = Color3.fromRGB(255, 120, 80)
+        alertBox.BackgroundColor3 = Color3.fromRGB(55, 10, 10)
+    elseif STATE.running then
+        alertText.TextColor3 = Color3.fromRGB(80, 220, 120)
+        alertBox.BackgroundColor3 = Color3.fromRGB(10, 22, 14)
+    else
+        alertText.TextColor3 = Color3.fromRGB(130, 130, 150)
+        alertBox.BackgroundColor3 = Color3.fromRGB(14, 14, 26)
+    end
+end
+
+local function startLoop()
+    if loopConn then loopConn:Disconnect() end
+    local lastCheck = 0
+    local lastUi = 0
+    loopConn = RunService.Heartbeat:Connect(function()
+        if STATE.destroyed then return end
+        local now = tick()
+        if STATE.running and now - lastCheck >= CHECK_INTERVAL then
+            lastCheck = now
+            updateLogic()
+        end
+        if now - lastUi >= UI_INTERVAL then
+            lastUi = now
+            updateUi()
+        end
+    end)
+end
+
+toggleBtn.MouseButton1Click:Connect(function()
+    STATE.running = not STATE.running
+    if STATE.running then
+        toggleBtn.Text = "Stop"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 20, 20)
+        refreshPaths()
+        updateLogic()
+        startLoop()
+    else
+        toggleBtn.Text = "Start"
+        toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 140, 60)
+        updateUi()
+    end
+end)
+
+closeBtn.MouseButton1Click:Connect(function()
+    STATE.destroyed = true
+    STATE.running = false
+    if loopConn then loopConn:Disconnect() end
+    gui:Destroy()
+end)
+
+refreshPaths()
+pcall(readLevel)
+updateLogic()
+updateUi()
+startLoop()
+
+if AUTOSTART == "true" then
+    task.wait(1)
+    STATE.running = true
+    toggleBtn.Text = "Stop"
+    toggleBtn.BackgroundColor3 = Color3.fromRGB(150, 20, 20)
+end
+
+print("[LevelOut] Target=" .. tostring(TARGET_LEVEL) .. " AutoKick=" .. AUTOKICK .. " AutoStart=" .. AUTOSTART)
