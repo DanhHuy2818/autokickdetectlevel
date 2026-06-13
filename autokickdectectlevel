@@ -4,9 +4,11 @@
 --   LocalPlayer.Data.Level
 --   fallback PlayerGui.Main.Level.Text = "Lv. 223"
 
-local Autostart = "false"     -- true = tu bat khi chay script, false = bam Start
-local Autokick  = "true"     -- true = kick/out that, false = test chi bao STOP
-local LevelOut  = ""      -- doi moc tai day, vi du "250", "700", "2800"
+local ArgAutostart, ArgAutokick, ArgLevelOut = ...
+
+local Autostart = ArgAutostart or getgenv().Autostart or "true"
+local Autokick  = ArgAutokick  or getgenv().Autokick  or "true"
+local LevelOut  = ArgLevelOut  or getgenv().LevelOut  or "250"
 
 local CHECK_INTERVAL = 0.20
 local UI_INTERVAL = 0.25
