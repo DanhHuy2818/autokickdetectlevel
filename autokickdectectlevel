@@ -8,7 +8,7 @@ local ArgAutostart, ArgAutokick, ArgLevelOut = ...
 
 local Autostart = ArgAutostart or getgenv().Autostart or "true"
 local Autokick  = ArgAutokick  or getgenv().Autokick  or "true"
-local LevelOut  = ArgLevelOut  or getgenv().LevelOut  or "1350"
+local LevelOut  = ArgLevelOut  or getgenv().LevelOut  or "250"
 
 local CHECK_INTERVAL = 0.20
 local UI_INTERVAL = 0.25
